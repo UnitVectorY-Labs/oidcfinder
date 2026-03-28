@@ -1,0 +1,11 @@
+name: oidcfinder
+default_branch: main
+config:
+  description: "Automates the discovery of OpenID Connect configuration URLs across list of domains."
+  license: MIT
+  language: go
+  release: release-go
+  justfile: true
+  codecov: false
+  gitignore:
+    - domains.db
