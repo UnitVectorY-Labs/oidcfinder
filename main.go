@@ -170,7 +170,7 @@ func processFile(db *sql.DB, path string, prefix string, outFile string, paralle
 	dbMutex := &sync.Mutex{}  // Mutex for database operations
 	outMutex := &sync.Mutex{} // Mutex for output file operations
 
-	for i := 0; i < parallel; i++ {
+	for range parallel {
 		wg.Add(1)
 		go worker(domainChan, resultChan, db, dbMutex, outFile, outMutex, timeoutSecs, &wg)
 	}
