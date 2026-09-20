@@ -74,12 +74,12 @@ func fixtureClient(counter *int) *http.Client {
 func TestImportCSVIdempotenceAndValidation(t *testing.T) {
 	s := testStore(t)
 	p := writeTestFile(t, "\ufeffrank,domain,categories\r\n1,Google.com,Search\r\n2,example.com,Test\r\n3,google.com,Duplicate\r\n")
-	n, a, e := s.importDomains(context.Background(), p, []string{"accounts", "auth"})
+	n, a, e := s.importDomains(context.Background(), p, []string{"accounts", "auth"}, nil)
 	check(t, e)
 	if n != 3 || a != 6 {
 		t.Fatalf("domains %d added %d", n, a)
 	}
-	_, a, e = s.importDomains(context.Background(), p, []string{"accounts", "auth"})
+	_, a, e = s.importDomains(context.Background(), p, []string{"accounts", "auth"}, nil)
 	check(t, e)
 	if a != 0 {
 		t.Fatal("not idempotent")
@@ -95,7 +95,7 @@ func TestImportCSVIdempotenceAndValidation(t *testing.T) {
 }
 func TestScanValidationAndDecisionPersistence(t *testing.T) {
 	s := testStore(t)
-	_, _, e := s.importDomains(context.Background(), writeTestFile(t, "auth.example.com\n"), nil)
+	_, _, e := s.importDomains(context.Background(), writeTestFile(t, "auth.example.com\n"), nil, nil)
 	check(t, e)
 	requests := 0
 	out := scan(context.Background(), fixtureClient(&requests), target{ID: 1, Host: "auth.example.com"}, map[string]bool{})
@@ -391,7 +391,7 @@ func TestLargeImport(t *testing.T) {
 	check(t, e)
 	check(t, f.Close())
 	start := time.Now()
-	n, a, e := s.importDomains(context.Background(), p, []string{"auth", "login"})
+	n, a, e := s.importDomains(context.Background(), p, []string{"auth", "login"}, nil)
 	check(t, e)
 	if n != 100000 || a != 300000 {
 		t.Fatalf("lost targets: %d %d", n, a)
@@ -413,11 +413,11 @@ func TestLargeImport(t *testing.T) {
 func TestBackoffPersistsAndCoversNewTargets(t *testing.T) {
 	s := testStore(t)
 	p := writeTestFile(t, "example.com\n")
-	_, _, e := s.importDomains(context.Background(), p, []string{"auth"})
+	_, _, e := s.importDomains(context.Background(), p, []string{"auth"}, nil)
 	check(t, e)
 	until := time.Now().Add(2 * time.Hour)
 	check(t, s.recordBackoff("example.com", until))
-	_, _, e = s.importDomains(context.Background(), p, []string{"auth", "login"})
+	_, _, e = s.importDomains(context.Background(), p, []string{"auth", "login"}, nil)
 	check(t, e)
 	var n int
 	check(t, s.db.QueryRow(`SELECT COUNT(*) FROM targets WHERE next_attempt>=?`, until.Unix()).Scan(&n))
@@ -440,7 +440,7 @@ func TestBackoffPersistsAndCoversNewTargets(t *testing.T) {
 func TestSchedulingTTLsAndImportCancellation(t *testing.T) {
 	s := testStore(t)
 	p := writeTestFile(t, "example.com\n")
-	_, _, e := s.importDomains(context.Background(), p, nil)
+	_, _, e := s.importDomains(context.Background(), p, nil, nil)
 	check(t, e)
 	for _, tc := range []struct {
 		kind string
@@ -457,7 +457,7 @@ func TestSchedulingTTLsAndImportCancellation(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if _, _, e = s.importDomains(ctx, p, nil); e == nil {
+	if _, _, e = s.importDomains(ctx, p, nil, nil); e == nil {
 		t.Fatal("canceled import succeeded")
 	}
 }
@@ -550,5 +550,59 @@ func TestTUISearchCancelAndStaleResults(t *testing.T) {
 	m = model.(reviewModel)
 	if len(m.items) != 0 {
 		t.Fatal("stale response replaced current view")
+	}
+}
+
+func TestImportSkipsInvalidDomainsAndContinuesAcrossBatches(t *testing.T) {
+	s := testStore(t)
+	var input strings.Builder
+	input.WriteString("rank,domain\n")
+	for i := 0; i < 1001; i++ {
+		fmt.Fprintf(&input, "%d,domain%d.example.com\n", i+1, i)
+	}
+	input.WriteString("1002,web\n1003,\n1004\n1005,127.0.0.1\n1006,after.example.com\n")
+	path := writeTestFile(t, input.String())
+	var warnings []int
+	report := func(row int, err error) {
+		if err == nil {
+			t.Error("missing skip reason")
+		}
+		warnings = append(warnings, row)
+	}
+	n, a, e := s.importDomains(context.Background(), path, []string{"auth"}, report)
+	check(t, e)
+	if n != 1002 || a != 2004 || fmt.Sprint(warnings) != "[1003 1004 1005 1006]" {
+		t.Fatalf("domains=%d added=%d warnings=%v", n, a, warnings)
+	}
+	var count int
+	check(t, s.db.QueryRow(`SELECT COUNT(*) FROM targets WHERE host IN ('after.example.com','auth.after.example.com')`).Scan(&count))
+	if count != 2 {
+		t.Fatal("rows after invalid domain were lost")
+	}
+	warnings = nil
+	n, a, e = s.importDomains(context.Background(), path, []string{"auth"}, report)
+	check(t, e)
+	if n != 1002 || a != 0 || len(warnings) != 4 {
+		t.Fatalf("repeat: %d %d %v", n, a, warnings)
+	}
+}
+
+func TestImportInvalidOnlyAndBrokenCSVFail(t *testing.T) {
+	for _, input := range []string{"web\nlocalhost\n", "domain\n\"unterminated\n"} {
+		s := testStore(t)
+		if _, _, err := s.importDomains(context.Background(), writeTestFile(t, input), nil, nil); err == nil {
+			t.Fatalf("accepted input %q", input)
+		}
+	}
+}
+
+func TestCLIInvalidDomainWarningsAreBounded(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	err := Run([]string{"crawl", "--domains", writeTestFile(t, "domain\n"+strings.Repeat("web\n", 15)), "--catalog-file", writeTestFile(t, "services: []\n"), "--db", filepath.Join(t.TempDir(), "crawl.db")}, &stdout, &stderr)
+	if err == nil || !strings.Contains(err.Error(), "no valid domains") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if strings.Count(stderr.String(), "warning: skipping domain input row") != 10 || !strings.Contains(stderr.String(), "5 additional invalid domain rows skipped") {
+		t.Fatal(stderr.String())
 	}
 }

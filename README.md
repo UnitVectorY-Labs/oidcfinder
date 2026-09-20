@@ -26,7 +26,7 @@ go build -o bin/oidcfinder .
 
 Every invocation downloads the latest [services.yaml](https://raw.githubusercontent.com/UnitVectorY-Labs/jwks-catalog/refs/heads/main/data/services.yaml), reconciles candidate membership, imports domains, and drains the due queue. A failed catalog refresh stops the crawl. There is no silent fallback to stale catalog data.
 
-Input can be Cloudflare `rank,domain,categories` CSV, a CSV with a named `domain` column, headerless `rank,domain` CSV, or one domain per line. Domain names are normalized, including internationalized names; malformed rows stop ingestion with a row number. Large files stream through transactions of 1,000 domains. Previously committed batches remain resumable if input parsing fails later.
+Input can be Cloudflare `rank,domain,categories` CSV, a CSV with a named `domain` column, headerless `rank,domain` CSV, or one domain per line. Domain names are normalized, including internationalized names; invalid domain values (such as single-label `web`), empty values, and missing domain columns are skipped. The CLI reports the first ten invalid rows and a total `skipped_rows` count. Broken CSV syntax, file/database errors, and cancellation still stop ingestion; an input with no valid domains also fails. Large files stream through transactions of 1,000 domains. Previously committed batches remain resumable if input parsing fails later.
 
 The apex and each configured prefix are probed over HTTPS at:
 

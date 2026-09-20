@@ -148,11 +148,20 @@ func Run(args []string, stdout, stderr io.Writer) error {
 		return fmt.Errorf("catalog refresh failed; crawl not started: %w", e)
 	}
 	fmt.Fprintf(stdout, "catalog refreshed: %d services\n", n)
-	count, added, e := s.importDomains(ctx, domains, prefixList)
+	skipped := 0
+	count, added, e := s.importDomains(ctx, domains, prefixList, func(row int, err error) {
+		skipped++
+		if skipped <= 10 {
+			fmt.Fprintf(stderr, "warning: skipping domain input row %d: %v\n", row, err)
+		}
+	})
+	if skipped > 10 {
+		fmt.Fprintf(stderr, "warning: %d additional invalid domain rows skipped\n", skipped-10)
+	}
 	if e != nil {
 		return e
 	}
-	fmt.Fprintf(stdout, "domains=%d new_targets=%d prefixes=%d (+ apex)\n", count, added, len(prefixList))
+	fmt.Fprintf(stdout, "domains=%d new_targets=%d skipped_rows=%d prefixes=%d (+ apex)\n", count, added, skipped, len(prefixList))
 	e = s.crawl(ctx, opt, stdout)
 	select {
 	case err := <-heartbeatErr:

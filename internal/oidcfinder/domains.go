@@ -78,7 +78,9 @@ func loadPrefixes(path string) ([]string, error) {
 }
 
 // Domain input is streamed; only one transaction batch is held at a time.
-func (s *Store) importDomains(ctx context.Context, path string, prefixes []string) (int, int, error) {
+// Invalid domain rows are skipped and optionally reported; CSV syntax errors
+// remain fatal because record boundaries may no longer be reliable.
+func (s *Store) importDomains(ctx context.Context, path string, prefixes []string, onInvalid func(int, error)) (int, int, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return 0, 0, err
@@ -136,11 +138,17 @@ func (s *Store) importDomains(ctx context.Context, path string, prefixes []strin
 			}
 		}
 		if col >= len(row) {
-			return domains, added, fmt.Errorf("row %d has no domain column", line)
+			if onInvalid != nil {
+				onInvalid(line, fmt.Errorf("missing domain column"))
+			}
+			continue
 		}
 		domain, e := validDomain(row[col])
 		if e != nil {
-			return domains, added, fmt.Errorf("row %d: %w", line, e)
+			if onInvalid != nil {
+				onInvalid(line, e)
+			}
+			continue
 		}
 		site, e := publicsuffix.EffectiveTLDPlusOne(domain)
 		if e != nil {
@@ -173,7 +181,7 @@ func (s *Store) importDomains(ctx context.Context, path string, prefixes []strin
 		}
 	}
 	if domains == 0 {
-		return 0, 0, fmt.Errorf("domain input contains no domains")
+		return 0, 0, fmt.Errorf("domain input contains no valid domains")
 	}
 	return domains, added, tx.Commit()
 }
