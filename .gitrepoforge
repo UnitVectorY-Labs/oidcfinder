@@ -1,7 +1,7 @@
 name: oidcfinder
 default_branch: main
 config:
-  description: "Automates the discovery of OpenID Connect configuration URLs across list of domains."
+  description: "Deterministically discovers public OIDC and OAuth authorization-server metadata, validates JWKS, and maintains reviewable catalog candidates."
   license: MIT
   language: go
   release: release-go
@@ -10,3 +10,8 @@ config:
     enabled: false
   gitignore:
     - domains.db
+    - data
+    - .env
+    - bin
+    - /cloudflare-radar*.csv
+    - "!/internal/oidcfinder/"

@@ -1,0 +1,13 @@
+# The apex domain is always scanned. Multi-label prefixes are supported.
+prefixes:
+  - auth
+  - accounts
+  - login
+  - sso
+  - id
+  - identity
+  - oauth
+  - oidc
+  - connect
+  - signin
+  - www
