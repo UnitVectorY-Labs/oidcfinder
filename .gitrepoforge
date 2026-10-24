@@ -1,6 +1,7 @@
 name: oidcfinder
 default_branch: main
 config:
+  osv: sarif
   description: "Deterministically discovers public OIDC and OAuth authorization-server metadata, validates JWKS, and maintains reviewable catalog candidates."
   license: MIT
   language: go
