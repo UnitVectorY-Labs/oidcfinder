@@ -5,7 +5,7 @@ go 1.27.0 // GOVERSION
 require (
 	github.com/charmbracelet/bubbletea v1.3.10
 	github.com/mattn/go-sqlite3 v1.14.52
-	golang.org/x/net v0.61.0
+	golang.org/x/net v0.62.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
