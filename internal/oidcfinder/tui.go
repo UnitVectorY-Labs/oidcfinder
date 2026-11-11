@@ -1,7 +1,8 @@
 package oidcfinder
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"fmt"
 	"io"
 	"strings"
@@ -234,7 +235,7 @@ func (m reviewModel) View() string {
 		c := m.items[m.cursor]
 		var meta any
 		_ = json.Unmarshal([]byte(c.Metadata), &meta)
-		pretty, _ := json.MarshalIndent(meta, "", "  ")
+		pretty, _ := json.Marshal(meta, jsontext.WithIndent("  "), json.Deterministic(true))
 		text := fmt.Sprintf("Issuer: %s\nJWKS: %s\nOIDC: %s\nOAuth: %s\nDecision: %s · In catalog: %t\nFirst: %s\nLast: %s\n\n%s", c.Issuer, c.JWKS, c.OIDC, c.OAuth, c.Decision, c.InCatalog, date(c.FirstSeen), date(c.LastSeen), pretty)
 		lines := []string{}
 		for _, line := range strings.Split(text, "\n") {
