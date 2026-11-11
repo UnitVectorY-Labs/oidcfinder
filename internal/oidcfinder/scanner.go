@@ -5,7 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"io"
@@ -149,7 +149,7 @@ func scan(ctx context.Context, client *http.Client, t target, known map[string]b
 			}
 			continue
 		}
-		b, _ := json.Marshal(m)
+		b, _ := json.Marshal(m, json.Deterministic(true))
 		d := discovery{Issuer: field(m, "issuer"), JWKS: field(m, "jwks_uri"), Metadata: string(b)}
 		if i == 0 {
 			d.OIDC = raw
