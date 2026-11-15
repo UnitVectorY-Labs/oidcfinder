@@ -1,20 +1,12 @@
-# Commands for oidcfinder
 
+# Commands for oidcfinder
 default:
   @just --list
-
+# Build oidcfinder with Go
 build:
-  mkdir -p bin
-  go build -o bin/oidcfinder .
+  go build ./...
 
+# Run tests for oidcfinder with Go
 test:
+  go clean -testcache
   go test ./...
-
-vet:
-  go vet ./...
-
-run *args:
-  ./run.sh {{args}}
-
-help:
-  go run . help
