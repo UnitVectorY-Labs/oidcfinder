@@ -2,15 +2,7 @@
 # Do not directly edit this file as it will be overwritten by the .gitrepoforge template.
 
 # Name of compile binary for Go executable
-# oidcfinder maintenance note: keep this anchored so internal/oidcfinder is
-# tracked; update the upstream gitrepoforge template as well.
-/oidcfinder
-
-# oidcfinder runtime state and local credentials. These entries are also
-# declared in .gitrepoforge; update the upstream template if they change.
-/bin/
-/data/
-/.env
+oidcfinder
 
 # https://www.toptal.com/developers/gitignore/api/macos
 ### macOS ###
@@ -139,9 +131,8 @@ go.work
 
 ## Additional Ignore Patterns
 domains.db
-
-# Downloaded Cloudflare Radar rankings (prefer data/).
+data
+.env
+bin
 /cloudflare-radar*.csv
-
-# Keep the engine visible if a generated binary-name rule is unanchored.
 !/internal/oidcfinder/
