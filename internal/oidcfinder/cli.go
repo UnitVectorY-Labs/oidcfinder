@@ -2,7 +2,8 @@ package oidcfinder
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"errors"
 	"flag"
 	"fmt"
@@ -94,9 +95,11 @@ func Run(args []string, stdout, stderr io.Writer) error {
 		if e != nil {
 			return e
 		}
-		enc := json.NewEncoder(stdout)
-		enc.SetIndent("", "  ")
-		return enc.Encode(status)
+		if err := json.MarshalWrite(stdout, status, jsontext.WithIndent("  "), json.Deterministic(true)); err != nil {
+			return err
+		}
+		_, err := io.WriteString(stdout, "\n")
+		return err
 	case "export":
 		n, e := s.exportAccepted(export)
 		if e == nil {
